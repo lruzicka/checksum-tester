@@ -4,9 +4,9 @@ with open("README.md", "r") as fh:
     long_description = fh.read()
 
 setuptools.setup(
-    name="fedora-checksum-tester",
+    name="fedora_checksum_tester",
     version="1.0",
-    py_modules=['checksum-tester'],
+    py_modules=['fedora_checksum_tester'],
     author="Lukáš Růžička",
     author_email="lruzicka@redhat.com",
     description="Image checksum tester for Fedora",
@@ -20,5 +20,5 @@ setuptools.setup(
         "Operating System :: OS Independent",
     ],
     install_requires=['wget', 'fedfind'],
-    entry_points={'console_scripts': ['checksum-tester = checksum-tester:main']}
+    entry_points={'console_scripts': ['fedora-checksum-tester = fedora_checksum_tester:main']}
 )
