@@ -108,7 +108,7 @@ def test_compose_md5(composes):
     return results
 
 
-composes = provide_compose(comp="20191218", arch="x86_64", variant="Server", typ="dvd")
+composes = provide_compose(comp="20200101", arch="x86_64", variant="Cloud")
 print(f"{len(composes)} comp. matching the criteria found.")
 download_iso(composes)
 test_compose_sha256(composes)
