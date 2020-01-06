@@ -1,8 +1,10 @@
 #!/usr/bin/python3
 
 """
-Checksum Tester calculates the checksums for the given ISO and compares it the with the official checksums.
-It automatically downloads the ISO image from Koji.
+Checksum-Tester calculates the SHA256 and MD5 checksums for the Fedora image files and compares it with the officially provided checksums.
+If the checksums match, this script reports PASSED, otherwise it reports FAILED.
+The images are automatically downloaded from Koji, if they have not been previously downloaded into the working directory. If so, they
+are not downloaded again, unless chosen so with a switch.
 """
 
 import argparse
@@ -11,6 +13,7 @@ import glob
 import os
 import fedfind.release
 import subprocess
+import sys
 import wget
 
 def read_cli():
@@ -22,6 +25,7 @@ def read_cli():
     parser.add_argument('-s', '--subvariant', default=None, help="Subvariant (For spins: KDE, LXCD, XFCE)")
     parser.add_argument('-t', '--type', default=None, help="Type of image (For server: boot, dvd)")
     parser.add_argument('-p', '--purge', default=False, help="Use 'True' if you want to delete downloaded after testing.")
+    parser.add_argument('-f', '--forcedownload', default=False, help="Use 'True' if you want to download images even when they already exist locally.")
     args = parser.parse_args()
     return args
     
@@ -37,14 +41,16 @@ def provide_compose(rel="Rawhide", comp=None, arch="x86_64", variant="Everything
             day = "0"+day
         comp = year + month + day
         print(f"The compose date were not given. Trying with today's value: {comp}")
-    composes = fedfind.release.get_release(release=rel, compose=comp)
+    try:    
+        composes = fedfind.release.get_release(release=rel, compose=comp)
+    except NameError:
+        print("fedfind is required to search for the images, you need to install it.")
     if subvariant:
         images = [compose for compose in composes.all_images if compose['arch'] == arch and compose['variant'] == variant and compose['subvariant'] == subvariant]
     elif typ:
         images = [compose for compose in composes.all_images if compose['arch'] == arch and compose['variant'] == variant and compose['type'] == typ]
     else:
         images = [compose for compose in composes.all_images if compose['arch'] == arch and compose['variant'] == variant]
-
     return images
 
 def return_iso_filename(url):
@@ -52,15 +58,19 @@ def return_iso_filename(url):
     filename = url.split('/')[-1]
     return filename
 
-def download_iso(composes):
+def download_iso(composes, forced="False"):
     """ Downloads the selected ISO images from Koji. """
     for compose in composes:
         url = compose['url']
         filename = return_iso_filename(url)
-        if filename in os.listdir():
+        if filename in os.listdir() and forced == "True":
             print(f"The ISO file {filename} seems to be downloaded already, skipping the download.")
         else:
-            wget.download(url)
+            print("Downloading images:")
+            try:
+                wget.download(url)
+            except NameError:
+                print("Downloading uses the wget module, but it is not installed.")
             print("")
 
 def purge_images(composes):
@@ -131,27 +141,27 @@ def print_available_composes(composes):
     else:
         message = "No image file matching the criteria found."
     print(message)
+    print("")
+    for compose in composes:
+        url = compose['url']
+        print(url)
+    print("")
 
 def main():
     """ Main program. """
     args = read_cli()
     composes = provide_compose(rel=args.release, comp=args.compose, arch=args.arch, variant=args.variant, subvariant=args.subvariant, typ=args.type)
-    print(composes)
     purge = args.purge
     print_available_composes(composes)
     download_iso(composes)
-    results = test_compose_sha256(composes)
-    print_results("SHA256 CHECKSUM", results)
-    results = test_compose_md5(composes)
-    print_results("MD5 CHECKSUM", results)
+    sha_results = test_compose_sha256(composes)
+    print_results("SHA256 CHECKSUM", sha_results)
+    md_results = test_compose_md5(composes)
+    print_results("MD5 CHECKSUM", md_results)
     if purge == "True":
         purge_images(composes)
+    if "FAILED" in sha_results.values() or "FAILED" in md_results.values():
+        sys.exit(1)
 
 if __name__ == '__main__':
     main()
-
-
-
-
-
-
