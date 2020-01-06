@@ -39,13 +39,13 @@ def provide_compose(rel="Rawhide", comp=None, arch="x86_64", variant="Everything
         print(f"The compose date were not given. Trying with today's value: {comp}")
     composes = fedfind.release.get_release(release=rel, compose=comp)
     if subvariant:
-        links = [compose for compose in composes.all_images if compose['arch'] == arch and compose['variant'] == variant and compose['subvariant'] == subvariant]
+        images = [compose for compose in composes.all_images if compose['arch'] == arch and compose['variant'] == variant and compose['subvariant'] == subvariant]
     elif typ:
-        links = [compose for compose in composes.all_images if compose['arch'] == arch and compose['variant'] == variant and compose['type'] == typ]
+        images = [compose for compose in composes.all_images if compose['arch'] == arch and compose['variant'] == variant and compose['type'] == typ]
     else:
-        links = [compose for compose in composes.all_images if compose['arch'] == arch and compose['variant'] == variant]
+        images = [compose for compose in composes.all_images if compose['arch'] == arch and compose['variant'] == variant]
 
-    return links
+    return images
 
 def return_iso_filename(url):
     """ Returns the filename from the url. """
@@ -63,10 +63,11 @@ def download_iso(composes):
             wget.download(url)
             print("")
 
-def purge_images(files):
+def purge_images(composes):
     """ Deletes all iso files from the working directory. """
-    for f in files:
-        target = return_iso_filename(f)
+    for compose in composes:
+        url = compose['url']
+        target = return_iso_filename(url)
         print(f"Deleting {target}")
         os.remove(target)
 
@@ -135,6 +136,7 @@ def main():
     """ Main program. """
     args = read_cli()
     composes = provide_compose(rel=args.release, comp=args.compose, arch=args.arch, variant=args.variant, subvariant=args.subvariant, typ=args.type)
+    print(composes)
     purge = args.purge
     print_available_composes(composes)
     download_iso(composes)
@@ -142,7 +144,7 @@ def main():
     print_results("SHA256 CHECKSUM", results)
     results = test_compose_md5(composes)
     print_results("MD5 CHECKSUM", results)
-    if purge == True:
+    if purge == "True":
         purge_images(composes)
 
 if __name__ == '__main__':
