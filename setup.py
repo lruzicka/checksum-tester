@@ -5,7 +5,7 @@ with open("README.md", "r") as fh:
 
 setuptools.setup(
     name="fedora_checksum_tester",
-    version="1.0",
+    version="1.1",
     py_modules=['fedora_checksum_tester'],
     author="Lukáš Růžička",
     author_email="lruzicka@redhat.com",

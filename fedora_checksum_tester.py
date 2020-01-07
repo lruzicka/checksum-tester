@@ -17,6 +17,7 @@ import sys
 import wget
 
 def read_cli():
+    """ Read the command line arguments and return them to the program. """
     parser = argparse.ArgumentParser()
     parser.add_argument('-r', '--release', default="Rawhide", help="Fedora release")
     parser.add_argument('-c', '--compose', default=None, help="Compose identifier, YYYYMMDD for Rawhide.")
@@ -31,8 +32,9 @@ def read_cli():
     
 def provide_compose(rel="Rawhide", comp=None, arch="x86_64", variant="Everything", subvariant=None, typ=None):
     """ Returns a compose download link base on given criteria. """
+    # If the compose ID is not given, we can try to fetch the latest compose according to the date. 
+    # However, for me, that only seems to be reliable with Rawhides.
     if not comp and rel=="Rawhide":
-        # If the compose date identificator is not given, 
         today = datetime.date.today()
         year, month, day = str(today.year), str(today.month), str(today.day)
         if len(month) < 2:
@@ -41,10 +43,12 @@ def provide_compose(rel="Rawhide", comp=None, arch="x86_64", variant="Everything
             day = "0"+day
         comp = year + month + day
         print(f"The compose date were not given. Trying with today's value: {comp}")
+    # Call fedfind to get the list of images in the compose.
     try:    
         composes = fedfind.release.get_release(release=rel, compose=comp)
     except NameError:
         print("fedfind is required to search for the images, you need to install it.")
+    # We sort some of the images out of the list based on the requirements.
     if subvariant:
         images = [compose for compose in composes.all_images if compose['arch'] == arch and compose['variant'] == variant and compose['subvariant'] == subvariant]
     elif typ:
@@ -55,11 +59,14 @@ def provide_compose(rel="Rawhide", comp=None, arch="x86_64", variant="Everything
 
 def return_iso_filename(url):
     """ Returns the filename from the url. """
+    # The information about the image file name is only available as a download link. 
+    # This method splits the link and takes the name out of it.
     filename = url.split('/')[-1]
     return filename
 
 def download_iso(composes, forced="False"):
     """ Downloads the selected ISO images from Koji. """
+    # We download all images in the list we obtained after we have reduced the fedfind results.
     for compose in composes:
         url = compose['url']
         filename = return_iso_filename(url)
@@ -81,11 +88,6 @@ def purge_images(composes):
         print(f"Deleting {target}")
         os.remove(target)
 
-def find_isofiles():
-    """ Finds all files with the .iso extension in the working directory. """
-    isofiles = glob.glob("*.iso")
-    return isofiles
-    
 def test_compose_sha256(composes):
     """ Checks if the SHA256 checksums match. """
     results = {}
@@ -93,13 +95,17 @@ def test_compose_sha256(composes):
         url = compose['url']
         filename = return_iso_filename(url)
         expected_sha = compose['checksums']['sha256']
+        # The test requires the sha256sum to calculate the checksum from the iso files, 
+        # so we use it externally.
         calculate = subprocess.run(['sha256sum', filename], capture_output=True)
         if calculate.returncode != 0:
             print(calculate.stderr.decode('utf-8'))
+        # If we have obtained the calculations successfully, we can compare the checksums.    
         else:
             calculated_sha = calculate.stdout.decode('utf-8').split(" ")
             calculated_sha = calculated_sha[0].strip()
         if expected_sha == calculated_sha:
+        # Report results    
             results[filename] = "PASSED"
         else:
             results[filename] = "FAILED"
@@ -111,9 +117,10 @@ def test_compose_md5(composes):
     for compose in composes:
         url = compose['url']
         filename = return_iso_filename(url)
+        # The test requires the checkisomd5 program so lets use it.
         checkmd = subprocess.run(['checkisomd5', filename], capture_output=True)
         output = checkmd.stdout.decode('utf-8')
-        print(output)
+        # Report results if went ok.
         if checkmd.returncode == 0:
             results[filename] = "PASSED"
         elif checkmd.returncode == 1:
