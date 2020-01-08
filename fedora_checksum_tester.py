@@ -15,6 +15,8 @@ import fedfind.release
 import subprocess
 import sys
 import wget
+from wikitcms.wiki import Wiki
+from wikitcms.wiki import ResTuple
 
 def read_cli():
     """ Read the command line arguments and return them to the program. """
@@ -26,23 +28,26 @@ def read_cli():
     parser.add_argument('-s', '--subvariant', default=None, help="Subvariant (For spins: KDE, LXCD, XFCE)")
     parser.add_argument('-t', '--type', default=None, help="Type of image (For server: boot, dvd)")
     parser.add_argument('-p', '--purge', default=False, help="Use 'True' if you want to delete downloaded after testing.")
-    parser.add_argument('-f', '--forcedownload', default=False, help="Use 'True' if you want to download images even when they already exist locally.")
+    parser.add_argument('-w', '--wiki', default=False, help="Use 'True' if you want to read the values from the current compose wiki page.")
+    parser.add_argument('-e', '--report', default=False, help="Use 'True' if you want to report results.")
+    parser.add_argument('-u', '--user', default=None, help="Who reports the results.")
     args = parser.parse_args()
     return args
-    
-def provide_compose(rel="Rawhide", comp=None, arch="x86_64", variant="Everything", subvariant=None, typ=None):
+
+def get_testpage():
+    site = Wiki()
+    page = site.get_validation_page('Installation')
+    return page
+
+def provide_compose(rel="Rawhide", comp=None, arch="x86_64", variant="Everything", subvariant=None, typ=None, wiki=False):
     """ Returns a compose download link base on given criteria. """
-    # If the compose ID is not given, we can try to fetch the latest compose according to the date. 
+    # If the compose ID is not given, we will the latest compose according to the wiki page. 
     # However, for me, that only seems to be reliable with Rawhides.
-    if not comp and rel=="Rawhide":
-        today = datetime.date.today()
-        year, month, day = str(today.year), str(today.month), str(today.day)
-        if len(month) < 2:
-            month = "0"+month
-        if len(day) < 2:
-            day = "0"+day
-        comp = year + month + day
-        print(f"The compose date were not given. Trying with today's value: {comp}")
+    if not comp or wiki == "True":
+        page = get_testpage()
+        comp = page.compose.split('.')[0]
+        rel = page.milestone
+        print(f"The compose date were not given or wiki requested. Using current wiki value: {comp}")
     # Call fedfind to get the list of images in the compose.
     try:    
         composes = fedfind.release.get_release(release=rel, compose=comp)
@@ -70,7 +75,7 @@ def download_iso(composes, forced="False"):
     for compose in composes:
         url = compose['url']
         filename = return_iso_filename(url)
-        if filename in os.listdir() and forced == "True":
+        if filename in os.listdir():
             print(f"The ISO file {filename} seems to be downloaded already, skipping the download.")
         else:
             print("Downloading images:")
@@ -154,10 +159,38 @@ def print_available_composes(composes):
         print(url)
     print("")
 
+def report_wiki_results(column, result, user=None, comment=None):
+    site = Wiki()
+    page = get_testpage()
+    test = page.find_resultrow('QA:Testcase_Mediakit_Checksums')
+    if not user:
+        user = "wallnut"
+        bot = True
+    else:
+        bot = False
+    if not comment:
+        comment = ''
+    result = ResTuple(
+                testtype = page.testtype,
+                release = page.release,
+                milestone = page.milestone,
+                compose = page.compose,
+                testcase = test.testcase,
+                section = test.section,
+                testname = test.name,
+                env = column,
+                status = result,
+                user = user,
+                bot = bot,
+                comment = comment)
+    site.login()
+    site.report_validation_results([result])
+    print(f"Results reported to: {test.name}.")
+                    
 def main():
     """ Main program. """
     args = read_cli()
-    composes = provide_compose(rel=args.release, comp=args.compose, arch=args.arch, variant=args.variant, subvariant=args.subvariant, typ=args.type)
+    composes = provide_compose(rel=args.release, comp=args.compose, arch=args.arch, variant=args.variant, subvariant=args.subvariant, typ=args.type, wiki=args.wiki)
     purge = args.purge
     print_available_composes(composes)
     download_iso(composes)
@@ -168,7 +201,25 @@ def main():
     if purge == "True":
         purge_images(composes)
     if "FAILED" in sha_results.values() or "FAILED" in md_results.values():
+        if args.report == "True":
+            if args.subvariant:
+                comment = args.subvariant
+            elif args.type:
+                comment = args.type
+            else:
+                comment = None
+            report_wiki_results(args.variant, 'fail', args.user, comment)
         sys.exit(1)
+    else:
+        if args.report == "True":
+            if args.subvariant:
+                comment = args.subvariant
+            elif args.type:
+                comment = args.type
+            else:
+                comment = None
+            report_wiki_results(args.variant, 'pass', args.user, comment)
+
 
 if __name__ == '__main__':
     main()
