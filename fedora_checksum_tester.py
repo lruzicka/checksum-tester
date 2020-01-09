@@ -43,7 +43,7 @@ def provide_compose(rel="Rawhide", comp=None, arch="x86_64", variant="Everything
     """ Returns a compose download link base on given criteria. """
     # If the compose ID is not given, we will the latest compose according to the wiki page. 
     # However, for me, that only seems to be reliable with Rawhides.
-    if not comp or wiki == "True":
+    if not comp or str.lower(wiki) == "true":
         page = get_testpage()
         comp = page.compose.split('.')[0]
         rel = page.milestone
@@ -159,7 +159,7 @@ def print_available_composes(composes):
         print(url)
     print("")
 
-def report_wiki_results(column, result, user=None, comment=None):
+def report_wiki_results(column, result, user=None, comment=''):
     site = Wiki()
     page = get_testpage()
     test = page.find_resultrow('QA:Testcase_Mediakit_Checksums')
@@ -168,8 +168,6 @@ def report_wiki_results(column, result, user=None, comment=None):
         bot = True
     else:
         bot = False
-    if not comment:
-        comment = ''
     result = ResTuple(
                 testtype = page.testtype,
                 release = page.release,
@@ -198,28 +196,22 @@ def main():
     print_results("SHA256 CHECKSUM", sha_results)
     md_results = test_compose_md5(composes)
     print_results("MD5 CHECKSUM", md_results)
-    if purge == "True":
+    if str.lower(purge) == "true":
         purge_images(composes)
+    if str.lower(args.report) == "true":
+        if args.subvariant:
+            comment = f"<ref>{args.subvariant} image</ref>"
+        elif args.type:
+            comment = f"<ref>{args.type} image</ref>"
+        else:
+            comment = '' 
     if "FAILED" in sha_results.values() or "FAILED" in md_results.values():
-        if args.report == "True":
-            if args.subvariant:
-                comment = args.subvariant
-            elif args.type:
-                comment = args.type
-            else:
-                comment = None
+        if str.lower(args.report) == "true":
             report_wiki_results(args.variant, 'fail', args.user, comment)
         sys.exit(1)
     else:
-        if args.report == "True":
-            if args.subvariant:
-                comment = args.subvariant
-            elif args.type:
-                comment = args.type
-            else:
-                comment = None
+        if str.lower(args.report) == "true":
             report_wiki_results(args.variant, 'pass', args.user, comment)
-
 
 if __name__ == '__main__':
     main()
