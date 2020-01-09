@@ -5,7 +5,7 @@ with open("README.md", "r") as fh:
 
 setuptools.setup(
     name="fedora_checksum_tester",
-    version="1.1",
+    version="1.2",
     py_modules=['fedora_checksum_tester'],
     author="Lukáš Růžička",
     author_email="lruzicka@redhat.com",
@@ -19,6 +19,6 @@ setuptools.setup(
         "License :: OSI Approved :: GNU General Public License v3 or later (GPLv3+)",
         "Operating System :: OS Independent",
     ],
-    install_requires=['wget', 'fedfind'],
+    install_requires=['wget', 'fedfind', 'wikitcms'],
     entry_points={'console_scripts': ['fedora-checksum-tester = fedora_checksum_tester:main']}
 )
